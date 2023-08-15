@@ -6,6 +6,8 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using SkiaSharp;
+using XboxIsoLib.Graphics;
 
 namespace XboxIsoLib
 {
@@ -20,10 +22,10 @@ namespace XboxIsoLib
         TailPageReadOnly = 0x20
     }
 
-    public sealed class XbeFile: IDisposable
+    public sealed class XbeFile : IDisposable
     {
         private Stream _stream;
-        public IDictionary<string, Section> Sections { get;  }
+        public IDictionary<string, Section> Sections { get; }
 
         public uint TitleId { get; }
         public string TitleName { get; }
@@ -39,14 +41,15 @@ namespace XboxIsoLib
                 return d1.Substring(0, Math.Min(d1.Length, 42));
             }
         }
+
         public uint BaseAddress { get; }
 
         public MediaFlags MediaFlags { get; }
         public GameRegion Region { get; }
         public uint DiscNumber { get; }
         public GameRating Rating { get; }
-        public byte[] TitleImage { get { return SectionData("$$XTIMAGE"); } }
-        public byte[] SaveImage { get { return SectionData("$$XSIMAGE"); } }
+        public SKImage TitleImage => ReadImage(SectionData("$$XTIMAGE"));
+        public SKImage SaveImage => ReadImage(SectionData("$$XSIMAGE"));
 
         public Dictionary<string, Dictionary<string, string>> SaveInfo
         {
@@ -175,75 +178,19 @@ namespace XboxIsoLib
             return data;
         }
 
-        // private static Image ReadImage(Stream stream, int offset, int size)
-        // {
-        //     stream.Seek(offset, SeekOrigin.Begin);
-        //     var xtimage = new byte[size];
-        //     var off = 0;
-        //     while (off < xtimage.Length)
-        //         off += stream.Read(xtimage, off, xtimage.Length - off);
-        //
-        //     var magic = Encoding.ASCII.GetString(xtimage, 0, 4);
-        //
-        //     if (magic == "XPR0")
-        //     {
-        //         var xpr = new XPR(xtimage);
-        //         var dds = xpr.ConvertToDDS(64, 64);
-        //         return dds.GetImage(dds.Type);
-        //     } else if(magic == "DDS ")
-        //     {
-        //         var pfimage = Pfimage.FromStream(new MemoryStream(xtimage));
-        //         System.Drawing.Imaging.PixelFormat format;
-        //
-        //         // Convert from Pfim's backend agnostic image format into GDI+'s image format
-        //         switch (pfimage.Format)
-        //         {
-        //             case Pfim.ImageFormat.Rgba32:
-        //                 format = System.Drawing.Imaging.PixelFormat.Format32bppArgb;
-        //                 break;
-        //             default:
-        //                 // see the sample for more details
-        //                 throw new NotImplementedException();
-        //         }
-        //
-        //         // Pin pfim's data array so that it doesn't get reaped by GC, unnecessary
-        //         // in this snippet but useful technique if the data was going to be used in
-        //         // control like a picture box
-        //         var handle = GCHandle.Alloc(pfimage.Data, GCHandleType.Pinned);
-        //         try
-        //         {
-        //             var data = Marshal.UnsafeAddrOfPinnedArrayElement(pfimage.Data, 0);
-        //             var bitmap = new Bitmap(pfimage.Width, pfimage.Height, pfimage.Stride, format, data);
-        //             return bitmap;
-        //         }
-        //         finally
-        //         {
-        //             handle.Free();
-        //         }
-        //     }
-        //
-        //     return Bitmap.FromStream(new MemoryStream(xtimage));
-        // }
-
-        // private static ImageSource ImgToSource(Image image)
-        // {
-        //
-        //     BitmapImage img = new BitmapImage();
-        //
-        //     using(MemoryStream stream = new MemoryStream())
-        //     {
-        //         image.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
-        //
-        //         stream.Seek(0, SeekOrigin.Begin);
-        //
-        //         img.BeginInit();
-        //         img.StreamSource = stream;
-        //         img.CacheOption = BitmapCacheOption.OnLoad;
-        //         img.EndInit();
-        //     }
-        //
-        //     return img;
-        // }
+        private static SKImage ReadImage(byte[] data)
+        {
+            if (data == null || data.Length < 4) return null;
+            switch (Encoding.ASCII.GetString(data, 0, 4))
+            {
+                case ImageType.XPR:
+                    return new XPR(data).AsImage();
+                case ImageType.DDS:
+                    return new DDSImage(data).images[0];
+                default:
+                    return SKImage.FromEncodedData(data);
+            }
+        }
 
         public sealed class Section
         {
