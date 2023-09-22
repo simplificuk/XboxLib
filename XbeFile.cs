@@ -43,6 +43,8 @@ namespace XboxIsoLib
         }
 
         public uint BaseAddress { get; }
+        public uint CertAddress { get; }
+        public uint SectionAddress { get; }
 
         public MediaFlags MediaFlags { get; }
         public GameRegion Region { get; }
@@ -98,23 +100,27 @@ namespace XboxIsoLib
                 throw new InvalidDataException("Invalid XBE file");
 
             stream.Seek(0x104, SeekOrigin.Begin);
-            var baseAddr = bin.ReadUInt32();
+            BaseAddress = bin.ReadUInt32();
+            var headerSize = bin.ReadUInt32();
+            var imageSize = bin.ReadUInt32();
+            var imageHeaderSize = bin.ReadUInt32();
+            var timeDate = bin.ReadUInt32();
 
             // Get cert & section offsets/counts
-            stream.Seek(0x118, SeekOrigin.Begin);
-            var certoff = bin.ReadUInt16();
-            bin.ReadUInt16();
+            CertAddress = bin.ReadUInt32();
             var numSections = bin.ReadUInt32();
-            var sectionOff = bin.ReadUInt32();
+            SectionAddress = bin.ReadUInt32();
+            var initFlags = bin.ReadUInt32();
+            var entryPoint = bin.ReadUInt32();
 
             // Read certificate info
-            stream.Seek(certoff, SeekOrigin.Begin);
+            stream.Seek(CertAddress - BaseAddress, SeekOrigin.Begin);
             var certSize = bin.ReadUInt32();
             var certTime = bin.ReadUInt32();
             TitleId = bin.ReadUInt32();
             var rawTitleName = bin.ReadBytes(80);
             TitleName = Encoding.Unicode.GetString(rawTitleName).TrimEnd('\0');
-            stream.Seek(certoff + 0x9c, SeekOrigin.Begin);
+            stream.Seek((CertAddress - BaseAddress) + 0x9c, SeekOrigin.Begin);
             MediaFlags = (MediaFlags)bin.ReadUInt32();
             Region = (GameRegion)bin.ReadUInt32();
             Rating = (GameRating)bin.ReadUInt32();
@@ -126,20 +132,21 @@ namespace XboxIsoLib
             // Read section info
             for (var i = 0; i < numSections; i++)
             {
-                stream.Seek((sectionOff - baseAddr) + (56 * i), SeekOrigin.Begin);
+                stream.Seek(SectionAddress - BaseAddress + 56 * i, SeekOrigin.Begin);
 
                 var flags = bin.ReadUInt32();
-                stream.Seek(0x8, SeekOrigin.Current);
+                var virtualAddress = bin.ReadUInt32();
+                var virtualSize = bin.ReadUInt32();
                 var dataOff = bin.ReadUInt32();
                 var sectionSize = bin.ReadUInt32();
                 var nameOff = bin.ReadUInt32();
-                stream.Seek(nameOff - baseAddr, SeekOrigin.Begin);
+                stream.Seek(nameOff - BaseAddress, SeekOrigin.Begin);
                 var sectionName = "";
                 byte b;
                 while ((b = bin.ReadByte()) != 0)
                     sectionName += (char)b;
 
-                sections[sectionName] = new Section(sectionName, (SectionFlag)flags, dataOff, sectionSize);
+                sections[sectionName] = new Section(sectionName, (SectionFlag)flags, virtualAddress, virtualSize, dataOff, sectionSize);
             }
 
             Sections = new Dictionary<string, Section>(sections);
@@ -162,7 +169,7 @@ namespace XboxIsoLib
                 return null;
             }
 
-            _stream.Position = section.RawAddress - BaseAddress;
+            _stream.Position = section.RawAddress;
             var data = new byte[section.RawSize];
             for (var totalRead = 0; totalRead < section.RawSize;)
             {
@@ -196,13 +203,17 @@ namespace XboxIsoLib
         {
             public SectionFlag Flags { get; }
             public string Name { get; }
+            public uint VirtualAddress { get; }
+            public uint VirtualSize { get; }
             public uint RawAddress { get;  }
             public uint RawSize { get;  }
 
-            public Section(string name, SectionFlag flags, uint address, uint size)
+            public Section(string name, SectionFlag flags, uint virtualAddress, uint virtualSize, uint address, uint size)
             {
                 Name = name;
                 Flags = flags;
+                VirtualAddress = virtualAddress;
+                VirtualSize = virtualSize;
                 RawAddress = address;
                 RawSize = size;
             }
