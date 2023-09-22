@@ -51,7 +51,7 @@ namespace XboxIsoLib
         public SKImage TitleImage => ReadImage(SectionData("$$XTIMAGE"));
         public SKImage SaveImage => ReadImage(SectionData("$$XSIMAGE"));
 
-        public Dictionary<string, Dictionary<string, string>> SaveInfo
+        public Dictionary<string, Dictionary<string, string>> TitleInfo
         {
             get
             {
