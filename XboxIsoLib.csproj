@@ -6,11 +6,15 @@
     <ProjectGuid>{688D80DB-92F8-4461-80B4-6E60868EBF44}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>XboxIsoLib</RootNamespace>
-    <AssemblyName>XboxIsoLib</AssemblyName>
+    <RootNamespace>XboxLib</RootNamespace>
+    <AssemblyName>XboxLib</AssemblyName>
     <TargetFramework>net6.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PackageId>XboxLib</PackageId>
+    <Authors>XboxLib</Authors>
+    <Company>Simplific</Company>
+    <Product>XboxLib</Product>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>

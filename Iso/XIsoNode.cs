@@ -1,11 +1,11 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 
-namespace XboxIsoLib
+namespace XboxLib.Iso
 {
     public class XIsoNode: IEnumerable<XIsoNode>
     {
-        public XboxIso Iso { get; internal set; }
+        public XIso Iso { get; internal set; }
         public bool Root { get; set; }
         public XIsoNode Parent { get; set; }
         public string Name { get; set; }
@@ -15,27 +15,17 @@ namespace XboxIsoLib
             } }
         public long Position { get; set; }
         public long Length { get; set; }
-        public XIsoAttributes Attributes { get; set; }
+        public XIsoAttribute Attributes { get; set; }
         public List<XIsoNode> Children { get; set; }
-        public bool IsDirectory {  get { return Attributes.HasFlag(XIsoAttributes.Directory); }}
-        public byte[] Data { get { return Iso.Read(this); } }
+        public bool IsDirectory => Attributes.HasFlag(XIsoAttribute.Directory);
+        public byte[] Data => Iso.Read(this);
 
-        public XIsoNode(): this(false)
+        public XIsoNode()
         {
-        }
-
-        internal XIsoNode(bool root)
-        {
-            Root = root;
-            if (root)
-            {
-                Name = "/";
-                Attributes = XIsoAttributes.Directory;
-            }
             Children = new List<XIsoNode>();
         }
 
-        internal XIsoNode(XIsoNode parent, string name, long pos, long len, XIsoAttributes attrs): this(false)
+        internal XIsoNode(XIsoNode parent, string name, long pos, long len, XIsoAttribute attrs): this()
         {
             if (parent != null)
             {
@@ -62,7 +52,7 @@ namespace XboxIsoLib
             return Children.GetEnumerator();
         }
 
-        public string ToString()
+        public override string ToString()
         {
             return FullPath;
         }

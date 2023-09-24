@@ -3,55 +3,51 @@ using System.IO;
 using System.Text;
 using K4os.Compression.LZ4;
 
-namespace XboxIsoLib;
+namespace XboxLib.Iso;
 
-public sealed class CsoStream : Stream, IDisposable, IAsyncDisposable
+public sealed class CsoDecompressionStream : Stream
 {
-    private BinaryReader _base;
+    private readonly BinaryReader _base;
 
     // compressed iso info
-    private uint headerSize;
-    private long totalBytes;
-    private uint blockSize;
-    private byte version;
-    private byte align;
-    private int align_b => 1 << align;
-    private int align_m => align_b - 1;
-    private uint[] blockIndex;
+    private readonly long _totalBytes;
+    private readonly uint _blockSize;
+    private readonly byte _align;
+    private readonly uint[] _blockIndex;
 
     // for reading/writing
-    private int currentBlock = 0;
-    private int offsetInBlock = 0;
-    private byte[] decompressionBuffer;
-    private byte[] currentBlockData;
+    private int _currentBlock = 0;
+    private int _offsetInBlock = 0;
+    private readonly byte[] _decompressionBuffer;
+    private readonly byte[] _currentBlockData;
 
-    public CsoStream(Stream source)
+    public CsoDecompressionStream(Stream source)
     {
         _base = new BinaryReader(source);
         if (!Encoding.ASCII.GetString(_base.ReadBytes(4)).Equals("CISO"))
             throw new IOException("Not a valid CISO file");
-        headerSize = _base.ReadUInt32();
-        totalBytes = _base.ReadInt64();
-        blockSize = _base.ReadUInt32();
-        decompressionBuffer = new byte[blockSize + 4];
-        version = _base.ReadByte();
+        var headerSize = _base.ReadUInt32();
+        _totalBytes = _base.ReadInt64();
+        _blockSize = _base.ReadUInt32();
+        _decompressionBuffer = new byte[_blockSize + 4];
+        var version = _base.ReadByte();
         if (version > 2) throw new IOException($"Unsupported CISO version: {version}");
-        align = _base.ReadByte();
+        _align = _base.ReadByte();
         _base.BaseStream.Position += 2;
 
         source.Position = headerSize;
-        blockIndex = new uint[(int)(totalBytes / blockSize) + 1];
-        for (var i = 0; i < blockIndex.Length; i++)
+        _blockIndex = new uint[(int)(_totalBytes / _blockSize) + 1];
+        for (var i = 0; i < _blockIndex.Length; i++)
         {
-            blockIndex[i] = _base.ReadUInt32();
+            _blockIndex[i] = _base.ReadUInt32();
         }
 
-        currentBlockData = new byte[blockSize];
+        _currentBlockData = new byte[_blockSize];
     }
 
     public override void Flush()
     {
-        throw new System.NotImplementedException();
+        throw new NotImplementedException();
     }
 
     public override int Read(byte[] buffer, int offset, int count)
@@ -60,16 +56,16 @@ public sealed class CsoStream : Stream, IDisposable, IAsyncDisposable
         while (read < count)
         {
             var remaining = count - read;
-            var remainingInBlock = blockSize - offsetInBlock;
+            var remainingInBlock = _blockSize - _offsetInBlock;
             var canRead = (int) Math.Min(remaining, remainingInBlock);
-            Array.Copy(currentBlockData, offsetInBlock, buffer, offset, canRead);
-            offsetInBlock += canRead;
+            Array.Copy(_currentBlockData, _offsetInBlock, buffer, offset, canRead);
+            _offsetInBlock += canRead;
             offset += canRead;
             read += canRead;
 
-            if (offsetInBlock == blockSize)
+            if (_offsetInBlock == _blockSize)
             {
-                ReadBlock(currentBlock + 1);
+                ReadBlock(_currentBlock + 1);
             }
         }
 
@@ -86,31 +82,31 @@ public sealed class CsoStream : Stream, IDisposable, IAsyncDisposable
             _ => offset
         };
 
-        var block = (int) (realOffset / blockSize);
+        var block = (int) (realOffset / _blockSize);
 
         ReadBlock(block);
-        offsetInBlock = (int) (realOffset % blockSize);
+        _offsetInBlock = (int) (realOffset % _blockSize);
 
         return Position;
     }
 
-    private long offsetForBlock(int block)
+    private long OffsetForBlock(int block)
     {
-        return (blockIndex[block] & 0x7fffffff) << align;
+        return (_blockIndex[block] & 0x7fffffff) << _align;
     }
 
     private void ReadBlock(int block)
     {
-        if (block > blockIndex.Length)
+        if (block > _blockIndex.Length)
             throw new IndexOutOfRangeException();
         
-        var blockOffset = offsetForBlock(block);
+        var blockOffset = OffsetForBlock(block);
 
-        var size = (int) (offsetForBlock(block + 1) - blockOffset);
+        var size = (int) (OffsetForBlock(block + 1) - blockOffset);
         
         _base.BaseStream.Position = blockOffset;
 
-        if ((blockIndex[block] & 0x80000000) == 0x80000000)
+        if ((_blockIndex[block] & 0x80000000) == 0x80000000)
         {
             // Lz4 compressed block
             var outOff = 0;
@@ -131,17 +127,17 @@ public sealed class CsoStream : Stream, IDisposable, IAsyncDisposable
 
                 for (var off = 0; off < bSize;)
                 {
-                    off += _base.Read(decompressionBuffer, off, bSize - off);
+                    off += _base.Read(_decompressionBuffer, off, bSize - off);
                 }
 
                 if (uncompressed)
                 {
-                    Array.Copy(decompressionBuffer, 0, currentBlockData, outOff, bSize);
+                    Array.Copy(_decompressionBuffer, 0, _currentBlockData, outOff, bSize);
                     outOff += bSize;
                 }
                 else
                 {
-                    var decompressed = LZ4Codec.Decode(decompressionBuffer, 0, bSize, currentBlockData, outOff, (int)blockSize - outOff);
+                    var decompressed = LZ4Codec.Decode(_decompressionBuffer, 0, bSize, _currentBlockData, outOff, (int)_blockSize - outOff);
                     if (decompressed < 0)
                     {
                         throw new Exception("FML");
@@ -149,7 +145,7 @@ public sealed class CsoStream : Stream, IDisposable, IAsyncDisposable
                     outOff += decompressed;
                 }
 
-                if (outOff == blockSize)
+                if (outOff == _blockSize)
                 {
                     break;
                 }
@@ -159,12 +155,12 @@ public sealed class CsoStream : Stream, IDisposable, IAsyncDisposable
         {
             for (var off = 0; off < size;)
             {
-                off += _base.Read(currentBlockData, off, size - off);
+                off += _base.Read(_currentBlockData, off, size - off);
             }
         }
 
-        currentBlock = block;
-        offsetInBlock = 0;
+        _currentBlock = block;
+        _offsetInBlock = 0;
     }
 
     public override void SetLength(long value)
@@ -180,11 +176,11 @@ public sealed class CsoStream : Stream, IDisposable, IAsyncDisposable
     public override bool CanRead => true;
     public override bool CanSeek => true;
     public override bool CanWrite => false;
-    public override long Length => totalBytes;
+    public override long Length => _totalBytes;
 
     public override long Position
     {
-        get => currentBlock * blockSize + offsetInBlock;
+        get => _currentBlock * _blockSize + _offsetInBlock;
         set => Seek(value, SeekOrigin.Begin);
     }
 

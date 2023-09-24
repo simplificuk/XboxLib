@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace XboxIsoLib.Graphics
+﻿namespace XboxLib.Graphics
 {
-    public enum XPRFormat : byte
+    public enum XprFormat : byte
     {
         D3DFMT_L8 = 0x00,
         D3DFMT_AL8 = 0x01,

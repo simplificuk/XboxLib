@@ -1,9 +1,9 @@
 ﻿using System;
 
-namespace XboxIsoLib
+namespace XboxLib.Iso
 {
     [Flags]
-    public enum XIsoAttributes
+    public enum XIsoAttribute
     {
         ReadOnly = 0x01,
         Hidden = 0x02,

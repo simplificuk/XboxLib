@@ -1,11 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+﻿using System.IO;
 using System.Text;
-using System.Threading.Tasks;
 
-namespace XboxIsoLib.Graphics
+namespace XboxLib.Graphics
 {
     public static class ImageType
     {
@@ -13,24 +9,24 @@ namespace XboxIsoLib.Graphics
         public const string XPR = "XPR0";
     } 
     
-    public class XPRHeader
+    public class XprHeader
     {
-        public uint FileSize;
-        public uint HeaderSize;
-        public string MagicBytes;
-        public uint TextureCommon;
-        public uint TextureData;
-        public byte TextureFormat;
-        public uint TextureLock;
-        public byte TextureMisc1;
-        public byte TextureRes1;
-        public byte TextureRes2;
+        public readonly uint FileSize;
+        public readonly uint HeaderSize;
+        public readonly string MagicBytes;
+        public readonly uint TextureCommon;
+        public readonly uint TextureData;
+        public readonly byte TextureFormat;
+        public readonly uint TextureLock;
+        public readonly byte TextureMisc1;
+        public readonly byte TextureRes1;
+        public readonly byte TextureRes2;
 
-        public XPRHeader()
+        public XprHeader()
         {
         }
 
-        public XPRHeader(BinaryReader br)
+        public XprHeader(BinaryReader br)
         {
             MagicBytes = Encoding.ASCII.GetString(br.ReadBytes(4));
             if (!MagicBytes.Equals(ImageType.XPR))

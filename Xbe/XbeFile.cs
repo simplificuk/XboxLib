@@ -4,12 +4,10 @@ using System.Data;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
 using SkiaSharp;
-using XboxIsoLib.Graphics;
+using XboxLib.Graphics;
 
-namespace XboxIsoLib
+namespace XboxLib.Xbe
 {
     [Flags]
     public enum SectionFlag : uint
@@ -24,24 +22,11 @@ namespace XboxIsoLib
 
     public sealed class XbeFile : IDisposable
     {
-        private Stream _stream;
+        private readonly Stream _stream;
         public IDictionary<string, Section> Sections { get; }
 
         public uint TitleId { get; }
         public string TitleName { get; }
-
-        public string FolderName
-        {
-            get
-            {
-                var a = TitleName.Replace("'", "");
-                var b = Regex.Replace(a, "[^a-zA-Z0-9 \\-]+", " ");
-                var c = Regex.Replace(b, "\\s+", " ");
-                var d1 = Thread.CurrentThread.CurrentCulture.TextInfo.ToTitleCase(c.Trim());
-                return d1.Substring(0, Math.Min(d1.Length, 42));
-            }
-        }
-
         public uint BaseAddress { get; }
         public uint CertAddress { get; }
         public uint SectionAddress { get; }
@@ -191,9 +176,9 @@ namespace XboxIsoLib
             switch (Encoding.ASCII.GetString(data, 0, 4))
             {
                 case ImageType.XPR:
-                    return new XPR(data).AsImage();
+                    return new XprImage(data).AsImage();
                 case ImageType.DDS:
-                    return new DDSImage(data).images[0];
+                    return new DdsImage(data).Images[0];
                 default:
                     return SKImage.FromEncodedData(data);
             }

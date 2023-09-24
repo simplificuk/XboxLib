@@ -4,14 +4,14 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
-namespace XboxIsoLib
+namespace XboxLib.Iso
 {
-    public sealed class XboxIso : IEnumerable<XIsoNode>
+    public sealed class XIso : IEnumerable<XIsoNode>, IDisposable
     {
-        const long XISO_SECTOR_SIZE = 2048;
+        private const long XIsoSectorSize = 2048;
 
-        public XIsoNode Root { get; set; }
-        public Stream Stream { get; private set; }
+        private XIsoNode Root { get; set; }
+        private Stream Stream { get; set; }
 
         public List<XIsoNode> GetEntries()
         {
@@ -64,12 +64,12 @@ namespace XboxIsoLib
             Stream = null;
         }
 
-        public static XboxIso Read(Stream input)
+        public static XIso Read(Stream input)
         {
             var reader = new BinaryReader(input);
             
             // Find out offset from ISO type (original xbox, GDF, XGD3)
-            var headerOff = 32 * XISO_SECTOR_SIZE;
+            const long headerOff = 32 * XIsoSectorSize;
             var rootOffset = -1L;
             foreach (var off in new uint[] { 0, 0xfd90000, 0x2080000 })
             {
@@ -87,10 +87,10 @@ namespace XboxIsoLib
             var dirTableSector = reader.ReadUInt32();
             var dirTableSize = reader.ReadUInt32();
 
-            var xi = new XboxIso
+            var xi = new XIso
             {
                 Stream = input,
-                Root = new XIsoNode(null, "", rootOffset + dirTableSector * XISO_SECTOR_SIZE, dirTableSize, XIsoAttributes.Directory)
+                Root = new XIsoNode(null, "", rootOffset + dirTableSector * XIsoSectorSize, dirTableSize, XIsoAttribute.Directory)
                     {
                         Root = true
                     }
@@ -111,33 +111,32 @@ namespace XboxIsoLib
 
             while (reader.BaseStream.Position + 14 < end)
             {
-                var l_offset = reader.ReadUInt16();
-                var r_offset = reader.ReadUInt16();
-                if (l_offset == 0xffff && r_offset == 0xffff)
+                var lOffset = reader.ReadUInt16();
+                var rOffset = reader.ReadUInt16();
+                if (lOffset == 0xffff && rOffset == 0xffff)
                 {
                     continue;
                 }
 
-                var start_sector = reader.ReadUInt32();
-                var file_size = reader.ReadUInt32();
-                var attrs = (XIsoAttributes)reader.ReadByte();
-                var stringLength = reader.ReadByte();
-                var nameBytes = reader.ReadBytes(stringLength);
-                var name = Encoding.ASCII.GetString(nameBytes);
+                var startSector = reader.ReadUInt32();
+                var fileSize = reader.ReadUInt32();
+                var attrs = (XIsoAttribute)reader.ReadByte();
+                var name = Encoding.ASCII.GetString(reader.ReadBytes(reader.ReadByte()));
 
                 var pos = reader.BaseStream.Position;
-
-                // Todo: this sometimes misses some entries?
-
-                var node = new XIsoNode(parent, name, rootOffset + start_sector * XISO_SECTOR_SIZE, file_size, attrs);
-
-                if (attrs.HasFlag(XIsoAttributes.Directory))
+                var node = new XIsoNode(parent, name, rootOffset + startSector * XIsoSectorSize, fileSize, attrs);
+                if (attrs.HasFlag(XIsoAttribute.Directory))
                 {
                     ReadDirectoryTable(node, reader, rootOffset);
                 }
 
                 reader.BaseStream.Position = pos + ((4 - (pos % 4)) % 4);
             }
+        }
+
+        public void Dispose()
+        {
+            Close();
         }
     }
 }
