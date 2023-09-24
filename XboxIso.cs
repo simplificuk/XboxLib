@@ -8,7 +8,7 @@ namespace XboxIsoLib
 {
     public sealed class XboxIso : IEnumerable<XIsoNode>
     {
-        const int XISO_SECTOR_SIZE = 2048;
+        const long XISO_SECTOR_SIZE = 2048;
 
         public XIsoNode Root { get; set; }
         public Stream Stream { get; private set; }
@@ -91,20 +91,21 @@ namespace XboxIsoLib
             {
                 Stream = input,
                 Root = new XIsoNode(null, "", rootOffset + dirTableSector * XISO_SECTOR_SIZE, dirTableSize, XIsoAttributes.Directory)
+                    {
+                        Root = true
+                    }
             };
-
             xi.Root.Iso = xi;
-            xi.Root.Root = true;
 
-            ReadDirectoryTable(xi.Root, reader, rootOffset, dirTableSector, dirTableSize);
+            ReadDirectoryTable(xi.Root, reader, rootOffset);
 
             return xi;
         }
 
-        private static void ReadDirectoryTable(XIsoNode parent, BinaryReader reader, long rootOffset, long sector, long size)
+        private static void ReadDirectoryTable(XIsoNode parent, BinaryReader reader, long rootOffset)
         {
-            var start = rootOffset + sector * XISO_SECTOR_SIZE;
-            var end = start + size;
+            var start = parent.Position;
+            var end = start + parent.Length;
 
             reader.BaseStream.Position = start;
 
@@ -132,7 +133,7 @@ namespace XboxIsoLib
 
                 if (attrs.HasFlag(XIsoAttributes.Directory))
                 {
-                    ReadDirectoryTable(node, reader, rootOffset, start_sector, file_size);
+                    ReadDirectoryTable(node, reader, rootOffset);
                 }
 
                 reader.BaseStream.Position = pos + ((4 - (pos % 4)) % 4);
