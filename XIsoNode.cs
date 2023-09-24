@@ -13,8 +13,8 @@ namespace XboxIsoLib
                 if (Root) return Name.Trim('/');
                 return Parent.FullPath + "/" +  Name.Trim('/');
             } }
-        public uint Position { get; set; }
-        public uint Length { get; set; }
+        public long Position { get; set; }
+        public long Length { get; set; }
         public XIsoAttributes Attributes { get; set; }
         public List<XIsoNode> Children { get; set; }
         public bool IsDirectory {  get { return Attributes.HasFlag(XIsoAttributes.Directory); }}
@@ -35,7 +35,7 @@ namespace XboxIsoLib
             Children = new List<XIsoNode>();
         }
 
-        internal XIsoNode(XIsoNode parent, string name, uint pos, uint len, XIsoAttributes attrs): this(false)
+        internal XIsoNode(XIsoNode parent, string name, long pos, long len, XIsoAttributes attrs): this(false)
         {
             if (parent != null)
             {
