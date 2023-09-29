@@ -162,20 +162,20 @@ namespace XboxLib.Xex
             var aes = Aes.Create();
             aes.BlockSize = 128;
             aes.KeySize = 128;
+            aes.Padding = PaddingMode.None;
             aes.Mode = CipherMode.CBC;
             aes.IV = new byte[16];
             aes.Key = key;
-            aes.Padding = PaddingMode.None;
             return aes;
         }
 
         public byte[] Decode()
         {
-            _stream.Position = PeDataAddress;
             using var reader = new BinaryReader(_stream, BinaryReader.Endian.Big, true);
             var formatInfo = FileFormat;
             if (formatInfo == null) return Array.Empty<byte>();
 
+            _stream.Position = PeDataAddress;
             return formatInfo.Compression.Type switch
             {
                 CompressionType.None => DecodeUncompressed(reader),
@@ -196,28 +196,22 @@ namespace XboxLib.Xex
             var uncompressedSize = compressionInfo.Blocks.Aggregate(0L, (current, block) => current + block.Size);
             var dest = new byte[uncompressedSize];
             var destOff = 0;
-            var aes = GetAesConfig(EncryptionKey);
-            using var cryptoStream = new CryptoStream(_stream, aes.CreateDecryptor(), CryptoStreamMode.Read, true);
-            
+
             var src = formatInfo.Encryption switch
             {
                 EncryptionType.None => _stream,
-                EncryptionType.Normal => cryptoStream,
-                _ => throw new InvalidOperationException($"unsupported encryption: {formatInfo.Encryption}")
+                EncryptionType.Normal => new CryptoStream(_stream, GetAesConfig(EncryptionKey).CreateDecryptor(),
+                    CryptoStreamMode.Read, true),
+                _ => throw new ArgumentOutOfRangeException($"unknown encryption type: {formatInfo.Encryption}")
             };
-            
+
             foreach (var block in compressionInfo.Blocks)
             {
-                for (var i = 0; i < block.DataSize;)
+                for (int i = 0; i < block.DataSize;)
                 {
-                    var toRead = 16;
-                    var end = i + toRead;
-                    while (i < end)
-                    {
-                        var read = src.Read(dest, destOff + i, end - i);
-                        if (read == 0) throw new EndOfStreamException();
-                        i += read;
-                    }
+                    var read = src.Read(dest, destOff + i, (int) block.DataSize - i);
+                    if (read == 0) throw new EndOfStreamException();
+                    i += read;
                 }
                 
                 destOff += (int) block.Size;
