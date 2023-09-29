@@ -22,19 +22,20 @@ namespace XboxLib.Xbe
 
     public sealed class XbeFile : IDisposable
     {
-        private readonly Stream _stream;
-        public IDictionary<string, Section> Sections { get; }
+        private Stream _stream;
 
-        public uint TitleId { get; }
-        public string TitleName { get; }
-        public uint BaseAddress { get; }
-        public uint CertAddress { get; }
-        public uint SectionAddress { get; }
+        public IDictionary<string, Section> Sections { get; private set; }
 
-        public MediaFlags MediaFlags { get; }
-        public GameRegion Region { get; }
-        public uint DiscNumber { get; }
-        public GameRating Rating { get; }
+        public uint TitleId { get; set; }
+        public string TitleName { get; set; }
+        public uint BaseAddress { get; set; }
+        public uint CertAddress { get; set; }
+        public uint SectionAddress { get; set; }
+
+        public MediaFlags MediaFlags { get; set; }
+        public GameRegion Region { get; set; }
+        public uint DiscNumber { get; set; }
+        public GameRating Rating { get; set; }
         public SKImage TitleImage => ReadImage(SectionData("$$XTIMAGE"));
         public SKImage SaveImage => ReadImage(SectionData("$$XSIMAGE"));
 
@@ -74,42 +75,40 @@ namespace XboxLib.Xbe
                 return data;
             }
         }
-
-        public XbeFile(Stream stream)
+        
+        public static XbeFile Read(Stream stream)
         {
-            _stream = stream;
-            
-            var bin = new BinaryReader(stream);
+            var bin = new XboxLib.IO.BinaryReader(stream);
             
             if (!Encoding.ASCII.GetString(bin.ReadBytes(4)).Equals("XBEH"))
                 throw new InvalidDataException("Invalid XBE file");
 
             stream.Seek(0x104, SeekOrigin.Begin);
-            BaseAddress = bin.ReadUInt32();
+            var baseAddress = bin.ReadUInt32();
             var headerSize = bin.ReadUInt32();
             var imageSize = bin.ReadUInt32();
             var imageHeaderSize = bin.ReadUInt32();
             var timeDate = bin.ReadUInt32();
 
             // Get cert & section offsets/counts
-            CertAddress = bin.ReadUInt32();
+            var certAddress = bin.ReadUInt32();
             var numSections = bin.ReadUInt32();
-            SectionAddress = bin.ReadUInt32();
+            var sectionAddress = bin.ReadUInt32();
             var initFlags = bin.ReadUInt32();
             var entryPoint = bin.ReadUInt32();
 
             // Read certificate info
-            stream.Seek(CertAddress - BaseAddress, SeekOrigin.Begin);
+            stream.Seek(certAddress - baseAddress, SeekOrigin.Begin);
             var certSize = bin.ReadUInt32();
             var certTime = bin.ReadUInt32();
-            TitleId = bin.ReadUInt32();
+            var titleId = bin.ReadUInt32();
             var rawTitleName = bin.ReadBytes(80);
-            TitleName = Encoding.Unicode.GetString(rawTitleName).TrimEnd('\0');
-            stream.Seek((CertAddress - BaseAddress) + 0x9c, SeekOrigin.Begin);
-            MediaFlags = (MediaFlags)bin.ReadUInt32();
-            Region = (GameRegion)bin.ReadUInt32();
-            Rating = (GameRating)bin.ReadUInt32();
-            DiscNumber = bin.ReadUInt32();
+            var titleName = Encoding.Unicode.GetString(rawTitleName).TrimEnd('\0');
+            stream.Seek((certAddress - baseAddress) + 0x9c, SeekOrigin.Begin);
+            var mediaFlags = (MediaFlags)bin.ReadUInt32();
+            var region = (GameRegion)bin.ReadUInt32();
+            var rating = (GameRating)bin.ReadUInt32();
+            var discNumber = bin.ReadUInt32();
             var version = bin.ReadUInt32();
 
 
@@ -117,7 +116,7 @@ namespace XboxLib.Xbe
             // Read section info
             for (var i = 0; i < numSections; i++)
             {
-                stream.Seek(SectionAddress - BaseAddress + 56 * i, SeekOrigin.Begin);
+                stream.Seek(sectionAddress - baseAddress + 56 * i, SeekOrigin.Begin);
 
                 var flags = bin.ReadUInt32();
                 var virtualAddress = bin.ReadUInt32();
@@ -125,7 +124,7 @@ namespace XboxLib.Xbe
                 var dataOff = bin.ReadUInt32();
                 var sectionSize = bin.ReadUInt32();
                 var nameOff = bin.ReadUInt32();
-                stream.Seek(nameOff - BaseAddress, SeekOrigin.Begin);
+                stream.Seek(nameOff - baseAddress, SeekOrigin.Begin);
                 var sectionName = "";
                 byte b;
                 while ((b = bin.ReadByte()) != 0)
@@ -134,7 +133,20 @@ namespace XboxLib.Xbe
                 sections[sectionName] = new Section(sectionName, (SectionFlag)flags, virtualAddress, virtualSize, dataOff, sectionSize);
             }
 
-            Sections = new Dictionary<string, Section>(sections);
+            return new XbeFile
+            {
+                _stream = stream,
+                Sections = sections,
+                BaseAddress = baseAddress,
+                CertAddress = certAddress,
+                DiscNumber = discNumber,
+                MediaFlags = mediaFlags,
+                Rating = rating,
+                Region = region,
+                SectionAddress = sectionAddress,
+                TitleId = titleId,
+                TitleName = titleName,
+            };
         }
 
         public void Close()
@@ -173,15 +185,12 @@ namespace XboxLib.Xbe
         private static SKImage ReadImage(byte[] data)
         {
             if (data == null || data.Length < 4) return null;
-            switch (Encoding.ASCII.GetString(data, 0, 4))
+            return Encoding.ASCII.GetString(data, 0, 4) switch
             {
-                case ImageType.XPR:
-                    return new XprImage(data).AsImage();
-                case ImageType.DDS:
-                    return new DdsImage(data).Images[0];
-                default:
-                    return SKImage.FromEncodedData(data);
-            }
+                ImageType.XPR => new XprImage(data).AsImage(),
+                ImageType.DDS => new DdsImage(data).Images[0],
+                _ => SKImage.FromEncodedData(data)
+            };
         }
 
         public sealed class Section

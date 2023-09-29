@@ -13,7 +13,7 @@ namespace XboxLib.Iso
         private XIsoNode Root { get; set; }
         private Stream Stream { get; set; }
 
-        public List<XIsoNode> GetEntries()
+        public List<XIsoNode> AllEntries()
         {
             var nodes = new List<XIsoNode>();
             var search = new Queue<XIsoNode>();
