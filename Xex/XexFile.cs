@@ -1,12 +1,15 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.Intrinsics.Arm;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Text;
 using XboxLib.Extensions;
+using Aes = System.Security.Cryptography.Aes;
 using BinaryReader = XboxLib.IO.BinaryReader;
 
 namespace XboxLib.Xex
@@ -90,6 +93,7 @@ namespace XboxLib.Xex
         public ModuleFlags Flags { get; set; }
         public uint PeDataAddress { get; set; }
         public uint SecurityAddress { get; set; }
+        public bool IsRetailSigned { get; set; }
 
         public uint BaseAddress => Headers.GetValue((uint) KnownHeaderIds.OriginalBaseAddress)?.Address ?? SecurityInfo.LoadAddress;
 
@@ -118,7 +122,7 @@ namespace XboxLib.Xex
         {
             get
             {
-                var aes = GetAesConfig(RetailKey);
+                var aes = GetAesConfig(IsRetailSigned ? RetailKey: DevkitKey);
                 return aes.DecryptCbc(SecurityInfo.AesKey, aes.IV, PaddingMode.None);
             }
         }
@@ -171,45 +175,41 @@ namespace XboxLib.Xex
 
         public byte[] Decode()
         {
-            using var reader = new BinaryReader(_stream, BinaryReader.Endian.Big, true);
             var formatInfo = FileFormat;
             if (formatInfo == null) return Array.Empty<byte>();
-
+            
             _stream.Position = PeDataAddress;
-            return formatInfo.Compression.Type switch
-            {
-                CompressionType.None => DecodeUncompressed(reader),
-                CompressionType.Basic => DecodeBasic(formatInfo),
-                CompressionType.Normal => DecodeNormal(reader, formatInfo),
-                _ => throw new NotImplementedException($"unsupported compression type: {formatInfo.Compression.Type}")
-            };
-        }
-
-        private byte[] DecodeUncompressed(BinaryReader reader)
-        {
-            return reader.ReadBytes((int) (reader.BaseStream.Length - PeDataAddress));
-        }
-
-        private byte[] DecodeBasic(FileFormatInfo formatInfo)
-        {
-            var compressionInfo = (BasicCompressionInfo)formatInfo.Compression;
-            var uncompressedSize = compressionInfo.Blocks.Aggregate(0L, (current, block) => current + block.Size);
-            var dest = new byte[uncompressedSize];
-            var destOff = 0;
-
-            var src = formatInfo.Encryption switch
+            var dataStream = formatInfo.Encryption switch
             {
                 EncryptionType.None => _stream,
                 EncryptionType.Normal => new CryptoStream(_stream, GetAesConfig(EncryptionKey).CreateDecryptor(),
                     CryptoStreamMode.Read, true),
                 _ => throw new ArgumentOutOfRangeException($"unknown encryption type: {formatInfo.Encryption}")
             };
+            using var dataReader = new BinaryReader(dataStream, BinaryReader.Endian.Big, true);
+
+            var compressedDataSize = (int) (_stream.Length - PeDataAddress);
+            return formatInfo.Compression.Type switch
+            {
+                CompressionType.None => dataReader.ReadBytes(compressedDataSize),
+                CompressionType.Basic => DecodeBasic(dataReader, formatInfo),
+                CompressionType.Normal => DecodeNormal(dataReader, formatInfo, compressedDataSize),
+                _ => throw new NotImplementedException($"unsupported compression type: {formatInfo.Compression.Type}")
+            };
+        }
+
+        private byte[] DecodeBasic(BinaryReader dataReader, FileFormatInfo formatInfo)
+        {
+            var compressionInfo = (BasicCompressionInfo)formatInfo.Compression;
+            var uncompressedSize = compressionInfo.Blocks.Aggregate(0L, (current, block) => current + block.Size);
+            var dest = new byte[uncompressedSize];
+            var destOff = 0;
 
             foreach (var block in compressionInfo.Blocks)
             {
-                for (int i = 0; i < block.DataSize;)
+                for (var i = 0; i < block.DataSize;)
                 {
-                    var read = src.Read(dest, destOff + i, (int) block.DataSize - i);
+                    var read = dataReader.Read(dest, destOff + i, (int) block.DataSize - i);
                     if (read == 0) throw new EndOfStreamException();
                     i += read;
                 }
@@ -220,10 +220,46 @@ namespace XboxLib.Xex
             return dest;
         }
         
-        private byte[] DecodeNormal(BinaryReader reader, FileFormatInfo formatInfo)
+        private byte[] DecodeNormal(BinaryReader reader, FileFormatInfo formatInfo, int compressedSize)
         {
             var compressionInfo = (NormalCompressionInfo)formatInfo.Compression;
 
+            var compressedDataStream = new MemoryStream(compressedSize);
+
+            // Read the compressed data
+            using var sha1 = SHA1.Create();
+            var block = compressionInfo.FirstBlock;
+            var buf = new byte[10000];
+            while(block.Size != 0)
+            {
+                using var shaStream = new CryptoStream(reader.BaseStream, sha1, CryptoStreamMode.Read, true);
+                using var shaReader = new BinaryReader(shaStream, reader.Endianness);
+                
+                sha1.Initialize();
+                var nextBlock = NormalCompressionInfo.Block.Read(shaReader);
+                
+                for (var remaining = (int) block.Size - 24; remaining > 0;)
+                {
+                    var read = shaReader.Read(buf, 0, Math.Min(remaining, buf.Length));
+                    if (read == 0) throw new EndOfStreamException();
+                    compressedDataStream.Write(buf, 0, read);
+                    remaining -= read;
+                }
+
+                sha1.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                var hash = sha1.Hash;
+                
+                if (!Enumerable.SequenceEqual(hash, block.Hash))
+                {
+                    Console.WriteLine($"Expected hash: {BitConverter.ToString(block.Hash)}");
+                    Console.WriteLine($"Computed hash: {BitConverter.ToString(hash)}");
+                    throw new InvalidDataException("Woopsie");
+                }
+                // Todo: check block hash
+                block = nextBlock;
+            }
+            
+            
             throw new NotImplementedException();
         }
 
@@ -231,7 +267,7 @@ namespace XboxLib.Xex
         {
         }
 
-        public static XexFile Read(Stream stream)
+        public static XexFile Read(Stream stream, bool is_retail = true)
         {
             var bin = new BinaryReader(stream, BinaryReader.Endian.Big);
             
@@ -257,6 +293,7 @@ namespace XboxLib.Xex
             return new XexFile()
             {
                 _stream = stream,
+                IsRetailSigned = is_retail,
                 Headers = headers,
                 Flags = flags,
                 SecurityAddress = securityInfoOffset,
