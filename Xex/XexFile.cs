@@ -1,13 +1,11 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.Intrinsics.Arm;
-using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Text;
+using XboxLib.Compression;
 using XboxLib.Extensions;
 using Aes = System.Security.Cryptography.Aes;
 using BinaryReader = XboxLib.IO.BinaryReader;
@@ -173,7 +171,7 @@ namespace XboxLib.Xex
             return aes;
         }
 
-        public byte[] Decode()
+        public byte[] GetPeImage()
         {
             var formatInfo = FileFormat;
             if (formatInfo == null) return Array.Empty<byte>();
@@ -223,44 +221,21 @@ namespace XboxLib.Xex
         private byte[] DecodeNormal(BinaryReader reader, FileFormatInfo formatInfo, int compressedSize)
         {
             var compressionInfo = (NormalCompressionInfo)formatInfo.Compression;
-
-            var compressedDataStream = new MemoryStream(compressedSize);
-
-            // Read the compressed data
-            using var sha1 = SHA1.Create();
-            var block = compressionInfo.FirstBlock;
-            var buf = new byte[10000];
-            while(block.Size != 0)
+            
+            var deblockStream = new NormalBlockStream(reader.BaseStream, compressionInfo);
+            var dest = new MemoryStream();
+            var decompressor = new LzxDecompression();
+            decompressor.Init(15, 0, compressedSize, compressedSize * 100, false, null);
+            try
             {
-                using var shaStream = new CryptoStream(reader.BaseStream, sha1, CryptoStreamMode.Read, true);
-                using var shaReader = new BinaryReader(shaStream, reader.Endianness);
-                
-                sha1.Initialize();
-                var nextBlock = NormalCompressionInfo.Block.Read(shaReader);
-                
-                for (var remaining = (int) block.Size - 24; remaining > 0;)
-                {
-                    var read = shaReader.Read(buf, 0, Math.Min(remaining, buf.Length));
-                    if (read == 0) throw new EndOfStreamException();
-                    compressedDataStream.Write(buf, 0, read);
-                    remaining -= read;
-                }
-
-                sha1.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-                var hash = sha1.Hash;
-                
-                if (!Enumerable.SequenceEqual(hash, block.Hash))
-                {
-                    Console.WriteLine($"Expected hash: {BitConverter.ToString(block.Hash)}");
-                    Console.WriteLine($"Computed hash: {BitConverter.ToString(hash)}");
-                    throw new InvalidDataException("Woopsie");
-                }
-                // Todo: check block hash
-                block = nextBlock;
+                decompressor.Decompress(deblockStream, dest, compressedSize * 100);
             }
-            
-            
-            throw new NotImplementedException();
+            catch (EndOfStreamException e)
+            {
+                // Ignore
+            }
+
+            return dest.ToArray();
         }
 
         private XexFile()
