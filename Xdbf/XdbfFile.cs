@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Microsoft.VisualBasic;
+using XboxLib.IO;
 using BinaryReader = XboxLib.IO.BinaryReader;
 
 namespace XboxLib.Xdbf;
@@ -12,10 +13,10 @@ public class XbdfFile
 {
     public struct EntryHeader
     {
-        public uint Magic { get; set; }
-        public uint Version { get; set; }
-        public uint Size { get; set; }
-        public ushort Count { get; set; }
+        public uint Magic;
+        public uint Version;
+        public uint Size;
+        public ushort Count;
 
         public static EntryHeader Read(BinaryReader reader)
         {
@@ -58,10 +59,10 @@ public class XbdfFile
 
     public struct Entry
     {
-        public Section Section { get; set; }
-        public ulong Id { get; set; }
-        public uint OffsetSpecifier { get; set; }
-        public uint Length { get; set; }
+        public Section Section;
+        public ulong Id;
+        public uint OffsetSpecifier;
+        public uint Length;
 
         public static Entry Read(BinaryReader reader)
         {
@@ -75,8 +76,8 @@ public class XbdfFile
 
     public struct FreeSpace
     {
-        public uint Offset { get; set; }
-        public uint Size { get; set; }
+        public uint Offset;
+        public uint Size;
 
         public static FreeSpace Read(BinaryReader reader)
         {
@@ -180,12 +181,12 @@ public class XbdfFile
     public static XbdfFile Read(Stream stream)
     {
         var start = stream.Position;
-        var reader = new BinaryReader(stream, BinaryReader.Endian.Big, true);
+        var reader = new BinaryReader(stream, Endianness.Big, true);
 
         var magic = Encoding.ASCII.GetString(reader.ReadBytes(4));
         if (magic == "FBDX")
         {
-            reader.Endianness = BinaryReader.Endian.Little;
+            reader.Endianness = Endianness.Little;
         }
         else if (magic != "XDBF")
         {

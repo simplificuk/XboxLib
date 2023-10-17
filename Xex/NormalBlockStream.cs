@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using XboxLib.IO;
 using BinaryReader = XboxLib.IO.BinaryReader;
 
 namespace XboxLib.Xex;
@@ -19,7 +20,7 @@ public class NormalBlockStream : Stream
     {
         _sha1 = SHA1.Create();
         _reader = new BinaryReader(new CryptoStream(dataStream, _sha1, CryptoStreamMode.Read, true),
-            BinaryReader.Endian.Big);
+            Endianness.Big);
         _compressionInfo = compressionInfo;
         _curBlock = _compressionInfo.FirstBlock;
     }

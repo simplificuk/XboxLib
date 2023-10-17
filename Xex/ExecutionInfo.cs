@@ -1,20 +1,22 @@
-using System.IO;
+using XboxLib.IO;
 
-public class ExecutionInfo
+namespace XboxLib.Xex;
+
+public struct ExecutionInfo
 {
-    public uint MediaId { get; set; }
-    public uint Version { get; set; }
-    public uint BaseVersion { get; set; }
-    public uint TitleId { get; set; }
-    public byte Platform { get; set; }
-    public byte ExecutableType { get; set; }
-    public byte DiscNumber { get; set; }
-    public byte DiscCount { get; set; }
+    public uint MediaId;
+    public uint Version;
+    public uint BaseVersion;
+    public uint TitleId;
+    public byte Platform;
+    public byte ExecutableType;
+    public byte DiscNumber;
+    public byte DiscCount;
+    public uint SaveGameId;
 
-    public static ExecutionInfo Read(Stream stream)
+    public static ExecutionInfo Read(BinaryReader reader)
     {
-        using var reader = new XboxLib.IO.BinaryReader(stream, XboxLib.IO.BinaryReader.Endian.Big, true);
-        return new ExecutionInfo()
+        return new ExecutionInfo
         {
             MediaId = reader.ReadUInt32(),
             Version = reader.ReadUInt32(),
@@ -23,7 +25,8 @@ public class ExecutionInfo
             Platform = reader.ReadByte(),
             ExecutableType = reader.ReadByte(),
             DiscNumber = reader.ReadByte(),
-            DiscCount = reader.ReadByte()
+            DiscCount = reader.ReadByte(),
+            SaveGameId = reader.ReadUInt32()
         };
     }
 }

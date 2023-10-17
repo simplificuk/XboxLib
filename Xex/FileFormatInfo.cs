@@ -18,7 +18,7 @@ public enum CompressionType : ushort
 
 public class CompressionInfo
 {
-    public CompressionType Type { get; set; }
+    public CompressionType Type;
 
     internal CompressionInfo(CompressionType type)
     {
@@ -30,8 +30,8 @@ public sealed class BasicCompressionInfo: CompressionInfo
 {
     public struct Block
     {
-        public uint DataSize { get; set; }
-        public uint ZeroSize { get; set; }
+        public uint DataSize;
+        public uint ZeroSize;
 
         public uint Size => DataSize + ZeroSize;
 
@@ -41,7 +41,7 @@ public sealed class BasicCompressionInfo: CompressionInfo
         }
     }
 
-    public Block[] Blocks { get; set; }
+    public Block[] Blocks;
     
     public BasicCompressionInfo(Block[] blocks): base(CompressionType.Basic)
     {
@@ -65,17 +65,17 @@ public sealed class NormalCompressionInfo : CompressionInfo
 {
     public struct Block
     {
-        public uint Size { get; set; }
-        public byte[] Hash { get; set; }
+        public uint Size;
+        public byte[] Hash;
 
         public static Block Read(XboxLib.IO.BinaryReader reader)
         {
             return new Block { Size = reader.ReadUInt32(), Hash = reader.ReadBytes(20) };
         }
     }
-    
-    public uint WindowSize { get; set; }
-    public Block FirstBlock { get; set; }
+
+    public uint WindowSize;
+    public Block FirstBlock;
 
     public NormalCompressionInfo(uint windowSize, Block firstBlock): base(CompressionType.Normal)
     {
@@ -91,12 +91,12 @@ public sealed class NormalCompressionInfo : CompressionInfo
 
 public class FileFormatInfo
 {
-    public EncryptionType Encryption { get; set; }
-    public CompressionInfo Compression { get; set; }
+    public EncryptionType Encryption;
+    public CompressionInfo Compression;
     
     public static FileFormatInfo Read(Stream stream)
     {
-        using var reader = new XboxLib.IO.BinaryReader(stream, IO.BinaryReader.Endian.Big, true);
+        using var reader = new XboxLib.IO.BinaryReader(stream, IO.Endianness.Big, true);
         var size = reader.ReadUInt32();
         var encryptionType = (EncryptionType) reader.ReadUInt16();
         var compressionType = (CompressionType)reader.ReadUInt16();

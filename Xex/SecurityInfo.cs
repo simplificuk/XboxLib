@@ -4,10 +4,10 @@ namespace XboxLib.Xex;
 
 public struct PageDescriptor
 {
-    public uint Value { get; set; }
+    public uint Value;
     public byte Info => (byte)((Value >> 28) & 0xF);
     public uint PageCount => (Value >> 4) & 0x0fffffff;
-    public byte[] Digest { get; set; }
+    public byte[] Digest;
 
     public static PageDescriptor Read(BinaryReader reader)
     {
@@ -24,7 +24,7 @@ public struct PageDescriptor
         var descriptors = new PageDescriptor[count];
         for (var i = 0; i < count; i++)
         {
-            descriptors[i] = PageDescriptor.Read(reader);
+            descriptors[i] = Read(reader);
         }
 
         return descriptors;

@@ -4,9 +4,8 @@ namespace XboxLib.Extensions;
 
 internal static class DictionaryFallbackExtension
 {
-    public static TV GetValue<TK, TV>(this IDictionary<TK, TV> dict, TK key, TV defaultValue = default(TV))
+    public static TV GetValue<TK, TV>(this IDictionary<TK, TV> dict, TK key, TV defaultValue = default)
     {
-        TV value;
-        return dict.TryGetValue(key, out value) ? value : defaultValue;
+        return dict.TryGetValue(key, out var value) ? value : defaultValue;
     }
 }

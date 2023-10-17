@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using XboxLib.Compression;
 using XboxLib.Extensions;
+using XboxLib.IO;
 using Aes = System.Security.Cryptography.Aes;
 using BinaryReader = XboxLib.IO.BinaryReader;
 
@@ -132,7 +133,7 @@ namespace XboxLib.Xex
                 var header = Headers.GetValue((uint)KnownHeaderIds.ExecutionInfo);
                 if (header == null) return null;
                 _stream.Position = header.Address;
-                return ExecutionInfo.Read(_stream);
+                return global::XboxLib.Xex.ExecutionInfo.Read(new BinaryReader(_stream, Endianness.Big, true));
             }
         }
 
@@ -141,7 +142,7 @@ namespace XboxLib.Xex
                 var header = Headers.GetValue((uint)KnownHeaderIds.ResourceInfo);
                 if (header == null) return new Dictionary<string, Resource>();
                 _stream.Position = header.Address;
-                using var reader = new BinaryReader(_stream, BinaryReader.Endian.Big, true);
+                using var reader = new BinaryReader(_stream, Endianness.Big, true);
                 var numResources = (reader.ReadUInt32() - 4) / 16;
                 var res = new Dictionary<string, Resource>((int) numResources);
                 for (var i = 0; i < numResources; i++)
@@ -184,7 +185,7 @@ namespace XboxLib.Xex
                     CryptoStreamMode.Read, true),
                 _ => throw new ArgumentOutOfRangeException($"unknown encryption type: {formatInfo.Encryption}")
             };
-            using var dataReader = new BinaryReader(dataStream, BinaryReader.Endian.Big, true);
+            using var dataReader = new BinaryReader(dataStream, Endianness.Big, true);
 
             var compressedDataSize = (int) (_stream.Length - PeDataAddress);
             return formatInfo.Compression.Type switch
@@ -244,7 +245,7 @@ namespace XboxLib.Xex
 
         public static XexFile Read(Stream stream, bool is_retail = true)
         {
-            var bin = new BinaryReader(stream, BinaryReader.Endian.Big);
+            var bin = new BinaryReader(stream, Endianness.Big);
             
             if (!Encoding.ASCII.GetString(bin.ReadBytes(4)).Equals("XEX2"))
                 throw new InvalidDataException("Invalid Xex file");
