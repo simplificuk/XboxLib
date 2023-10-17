@@ -366,11 +366,11 @@ public sealed class LzxDecompression {
 									throw new IOException("match ran over window wrap");
 								}
 								runDest = _windowPos;
-								i = (uint) matchLength;
+								i = matchLength;
 								if (matchOffset > _windowPos) {
 									if (matchOffset > _offset && (matchOffset - _windowPos) > _refDataSize)
 										throw new IOException("match offset beyond LZX stream");
-									j = (uint) (matchOffset - _windowPos);
+									j = (matchOffset - _windowPos);
 									if (j > _windowSize) {
 										throw new IOException("match offset beyond window boundaries");
 									}
@@ -384,7 +384,7 @@ public sealed class LzxDecompression {
 									while (i-- > 0)
 										_window[runDest++] = _window[runSrc++];
 								} else {
-									runSrc = (uint) (runDest - matchOffset);
+									runSrc = (runDest - matchOffset);
 									while (i-- > 0)
 										_window[runDest++] = _window[runSrc++];
 								}
@@ -479,12 +479,12 @@ public sealed class LzxDecompression {
 									throw new IOException("match ran over window wrap");
 								}
 								runDest = _windowPos;
-								i = (uint) matchLength;
+								i = matchLength;
 								if (matchOffset > _windowPos) {
 									if (matchOffset > _offset && (matchOffset - _windowPos) > _refDataSize) {
 										throw new IOException("match offset beyond LZX stream");
 									}
-									j = (uint) (matchOffset - _windowPos);
+									j = (matchOffset - _windowPos);
 									if (j > _windowSize) {
 										throw new IOException("match offset beyond window boundaries");
 									}

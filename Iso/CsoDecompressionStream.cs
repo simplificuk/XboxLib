@@ -82,10 +82,10 @@ public sealed class CsoDecompressionStream : Stream
             _ => offset
         };
 
-        var block = (int) (realOffset / _blockSize);
+        var block = (int)(realOffset / _blockSize);
 
         ReadBlock(block);
-        _offsetInBlock = (int) (realOffset % _blockSize);
+        _offsetInBlock = (int)(realOffset % _blockSize);
 
         return Position;
     }
@@ -98,15 +98,15 @@ public sealed class CsoDecompressionStream : Stream
     private void ReadBlock(int block)
     {
         if (block > _blockIndex.Length)
-            throw new IndexOutOfRangeException();
-        
+            throw new EndOfStreamException();
+
         var blockOffset = OffsetForBlock(block);
 
-        var size = (int) (OffsetForBlock(block + 1) - blockOffset);
-        
+        var size = (int)(OffsetForBlock(block + 1) - blockOffset);
+
         _base.BaseStream.Position = blockOffset;
 
-        if ((_blockIndex[block] & 0x80000000) == 0x80000000)
+        if ((_blockIndex[block] & 0x80000000) != 0)
         {
             // Lz4 compressed block
             var outOff = 0;
@@ -137,11 +137,13 @@ public sealed class CsoDecompressionStream : Stream
                 }
                 else
                 {
-                    var decompressed = LZ4Codec.Decode(_decompressionBuffer, 0, bSize, _currentBlockData, outOff, (int)_blockSize - outOff);
+                    var decompressed = LZ4Codec.Decode(_decompressionBuffer, 0, bSize, _currentBlockData, outOff,
+                        (int)_blockSize - outOff);
                     if (decompressed < 0)
                     {
                         throw new Exception("FML");
                     }
+
                     outOff += decompressed;
                 }
 
