@@ -33,7 +33,6 @@ public sealed class CsoDecompressionStream : Stream
         var version = _base.ReadByte();
         if (version > 2) throw new IOException($"Unsupported CISO version: {version}");
         _align = _base.ReadByte();
-        _base.BaseStream.Position += 2;
 
         source.Position = headerSize;
         _blockIndex = new uint[(int)(_totalBytes / _blockSize) + 1];
@@ -57,16 +56,24 @@ public sealed class CsoDecompressionStream : Stream
         {
             var remaining = count - read;
             var remainingInBlock = _blockSize - _offsetInBlock;
-            var canRead = (int) Math.Min(remaining, remainingInBlock);
+            var canRead = (int)Math.Min(remaining, remainingInBlock);
+
             Array.Copy(_currentBlockData, _offsetInBlock, buffer, offset, canRead);
+
             _offsetInBlock += canRead;
             offset += canRead;
             read += canRead;
 
-            if (_offsetInBlock == _blockSize)
+            if (_offsetInBlock != _blockSize) continue;
+            if (_currentBlock >= _blockIndex.Length - 2)
             {
-                ReadBlock(_currentBlock + 1);
+                _currentBlock += 1;
+                if (_currentBlock > _blockIndex.Length)
+                    throw new EndOfStreamException();
+                return read;
             }
+
+            ReadBlock(_currentBlock + 1);
         }
 
         return read;
@@ -97,7 +104,7 @@ public sealed class CsoDecompressionStream : Stream
 
     private void ReadBlock(int block)
     {
-        if (block > _blockIndex.Length)
+        if (block >= _blockIndex.Length)
             throw new EndOfStreamException();
 
         var blockOffset = OffsetForBlock(block);
@@ -167,12 +174,12 @@ public sealed class CsoDecompressionStream : Stream
 
     public override void SetLength(long value)
     {
-        throw new System.NotImplementedException();
+        throw new NotSupportedException();
     }
 
     public override void Write(byte[] buffer, int offset, int count)
     {
-        throw new System.NotImplementedException();
+        throw new NotSupportedException();
     }
 
     public override bool CanRead => true;
