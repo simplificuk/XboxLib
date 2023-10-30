@@ -239,7 +239,6 @@ public sealed class LzxDecompression {
 					i = ReadBits(16);
 					j = ReadBits(8);
 					_blockRemaining = _blockLength = (int) ((i << 8) | j);
-					Console.WriteLine($"Block: {_blockType}, len: {_blockLength}");
 					switch (_blockType) {
 						case LzxBlockTypeAligned:
 							for (i = 0; i < 8; i++) {

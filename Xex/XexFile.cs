@@ -152,8 +152,6 @@ namespace XboxLib.Xex
                     var size = reader.ReadUInt32();
                     var r = new Resource() { Name = name, Address = address, Size = size };
                     res.Add(r.Name, r);
-                    Console.WriteLine($"\t: {r.Name}: {r.Address:X}-{r.Address+size:X} ({size}b)");
-                    
                 }
 
                 return res;

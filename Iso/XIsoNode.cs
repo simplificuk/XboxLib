@@ -10,7 +10,7 @@ namespace XboxLib.Iso
         public XIsoNode Parent { get; set; }
         public string Name { get; set; }
         public string FullPath { get {
-                if (Root) return Name.Trim('/');
+                if (Root || Parent.Root) return Name.Trim('/');
                 return Parent.FullPath + "/" +  Name.Trim('/');
             } }
         public long Position { get; set; }
