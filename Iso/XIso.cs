@@ -3,6 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using XboxLib.IO;
+using BinaryReader = System.IO.BinaryReader;
 
 namespace XboxLib.Iso
 {
@@ -10,7 +12,7 @@ namespace XboxLib.Iso
     {
         private const long XIsoSectorSize = 2048;
 
-        private XIsoNode Root { get; set; }
+        public XIsoNode Root { get; private set; }
         private Stream Stream { get; set; }
 
         public List<XIsoNode> AllEntries()
@@ -50,8 +52,7 @@ namespace XboxLib.Iso
         public Stream GetDataStream(XIsoNode node)
         {
             if (node.IsDirectory) throw new ArgumentException("directories do not have a data stream");
-            Stream.Position = node.Position;
-            return Stream;
+            return new ReadableSubStream(Stream, node.Position, node.Length);
         }
 
         public IEnumerator<XIsoNode> GetEnumerator()
@@ -78,7 +79,7 @@ namespace XboxLib.Iso
             // Find out offset from ISO type (original xbox, GDF, XGD3)
             const long headerOff = 32 * XIsoSectorSize;
             var rootOffset = -1L;
-            foreach (var off in new uint[] { 0, 0x10000, 0xfd90000, 0x2080000 })
+            foreach (var off in new uint[] { 0, 0x10000, 0xfd90000, 0x2080000, 0x18300000 })
             {
                 input.Position = headerOff + off;
                 if (Encoding.ASCII.GetString(reader.ReadBytes(20)) != "MICROSOFT*XBOX*MEDIA") continue;
