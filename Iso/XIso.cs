@@ -68,7 +68,7 @@ namespace XboxLib.Iso
         public void Close()
         {
             Root = null;
-            Stream.Close();
+            Stream?.Close();
             Stream = null;
         }
 
@@ -144,7 +144,18 @@ namespace XboxLib.Iso
 
         public void Dispose()
         {
-            Close();
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
+
+        private void Dispose(bool disposing)
+        {
+            if (Root != null)
+            {
+                Close();
+            }
+        }
+        
+        ~XIso() { Dispose(false); }
     }
 }
